@@ -550,6 +550,8 @@
 <div class="container">
   <div class="two-col">
 
+    
+
     <!-- LEFT: REPORT PANEL -->
     <div>
       <div class="panel">
@@ -558,6 +560,14 @@
           <span style="font-size:11px;color:#27ae60;font-weight:500;">● System Active</span>
         </div>
         <div class="panel-body">
+          <div class="form-field">
+  <label class="form-label">Photo Evidence</label>
+  <input type="file" id="photoUpload" accept="image/*" capture="environment" class="form-input">
+</div>
+
+<div id="staffInstructionBanner" style="display:none; background:#ffeb3b; border:2px solid #fbc02d; padding:15px; border-radius:8px; margin-bottom:20px; font-weight:bold; color:#000; text-align:center;">
+    ⚠️ MESSAGE FROM STAFF: <span id="instructionText"></span>
+</div>
 
           <!-- Language Selector -->
           <div class="form-field">
@@ -874,6 +884,46 @@ Keep each instruction under 10 words. Plain text, numbered list. No English tran
 }
 
 /* ════ HANDLE EMERGENCY ════ */
+  // 1. Update handleEmergency to include a placeholder for instructions
+window.handleEmergency = async (type) => {
+  const locName = document.getElementById('location').value;
+  const prio = document.getElementById('priority').value;
+  if (!locName) return alert("Please enter a location");
+
+  const docRef = await addDoc(collection(db, "emergencies"), {
+    type,
+    location: locName,
+    priority: prio,
+    floor: document.getElementById('floorSelect').value,
+    status: "ongoing",
+    time: new Date().toISOString(),
+    reports: 1,
+    staffInstruction: "" // Placeholder for the 'Bridge'
+  });
+
+  // Start listening for instructions for THIS specific report
+  listenForStaffReplies(docRef.id);
+  document.getElementById('location').value = "";
+};
+
+// 2. New function to show messages to the guest
+function listenForStaffReplies(reportId) {
+  const docRef = doc(db, "emergencies", reportId);
+  onSnapshot(docRef, (doc) => {
+    const data = doc.data();
+    if (data && data.staffInstruction) {
+      const banner = document.getElementById('staffInstructionBanner');
+      const text = document.getElementById('instructionText');
+      text.textContent = data.staffInstruction;
+      banner.style.display = 'block';
+      // Auto-scroll to top so guest sees the instruction
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+  });
+}
+
+
+  
 window.handleEmergency = async function(type) {
   const location = document.getElementById("location").value.trim();
   const priority = document.getElementById("priority").value;
@@ -895,6 +945,19 @@ window.handleEmergency = async function(type) {
   }
 
   showStatus(`<span class="spinner"></span> Sending alert & generating protocol…`, "info");
+
+
+  window.sendInstruction = async (id) => {
+  const input = document.getElementById(`ins_${id}`);
+  const message = input.value;
+  if (!message) return alert("Type a message first");
+  
+  await updateDoc(doc(db, "emergencies", id), {
+    staffInstruction: message
+  });
+  alert("Instruction sent to guest.");
+  input.value = "";
+};
 
   // Random map position within canvas bounds
   const mapX = Math.floor(Math.random() * 280) + 30;
@@ -1012,6 +1075,21 @@ onSnapshot(q, snap => {
 
 /* ════ RENDER ALERTS ════ */
 function render() {
+
+  // Inside your render() function, locate the 'isStaff' section of the template:
+${isStaff ? `
+  <div style="margin-top:10px;">
+    <input type="text" id="ins_${d.id}" placeholder="Send instruction to guest..." class="form-input" style="font-size:12px;">
+    <button class="btn-small" style="margin-top:5px; width:100%; background:var(--accent); color:white;" 
+      onclick="sendInstruction('${d.id}')">📢 Send Instruction</button>
+  </div>
+  <hr style="margin:10px 0;">
+  <button class="btn-small" onclick="updateStatus('${d.id}', 'resolved')">✅ Resolve</button>
+` : `
+  <button class="btn-small">👍 I see this too</button>
+`}
+
+  
   const list = document.getElementById("alertList");
 
   if (!dataCache.length) {
