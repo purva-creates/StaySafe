@@ -3,1170 +3,281 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>StaySafe — Crisis Response</title>
+  <title>StaySafe — Crisis Response AI</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg: #f5f4f0;
-      --surface: #ffffff;
-      --border: #ddd8d0;
-      --text: #1a1a1a;
-      --muted: #6b6860;
-      --fire: #c0392b;
-      --fire-bg: #fdf0ee;
-      --medical: #1a6fb0;
-      --medical-bg: #eef4fb;
-      --security: #b58a00;
-      --security-bg: #fdf8e8;
-      --ongoing: #c0392b;
-      --controlled: #d07000;
-      --resolved: #2d7a4f;
-      --accent: #2c3e50;
+      --bg: #f5f4f0; --surface: #ffffff; --border: #ddd8d0; --text: #1a1a1a;
+      --muted: #6b6860; --fire: #c0392b; --fire-bg: #fdf0ee;
+      --medical: #1a6fb0; --medical-bg: #eef4fb;
+      --security: #b58a00; --security-bg: #fdf8e8;
+      --accent: #2c3e50; --resolved: #2d7a4f;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); }
 
-    body {
-      font-family: 'IBM Plex Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    /* ── TOP BAR ── */
+    /* --- TOP BAR --- */
     .topbar {
-      background: var(--accent);
-      color: white;
-      padding: 0 24px;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      background: var(--accent); color: white; padding: 0 24px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
     }
-    .topbar-left { display: flex; align-items: center; gap: 12px; }
-    .topbar-logo {
-      font-family: 'IBM Plex Mono', monospace;
-      font-weight: 600;
-      font-size: 16px;
-      letter-spacing: 0.05em;
-    }
+    .topbar-logo { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
     .topbar-logo span { color: #e74c3c; }
-    .topbar-tag {
-      font-size: 11px;
-      background: rgba(255,255,255,0.15);
-      padding: 2px 8px;
-      border-radius: 3px;
-      letter-spacing: 0.08em;
-    }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-    .mode-pill {
-      font-size: 12px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-weight: 500;
-      background: rgba(255,255,255,0.12);
-      color: #ccc;
-      transition: all 0.2s;
-    }
+    
+    .mode-pill { font-size: 12px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.12); color: #ccc; }
     .mode-pill.active { background: #e74c3c; color: white; }
-    .toggle-btn {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 5px 14px;
-      border-radius: 5px;
-      font-size: 13px;
-      cursor: pointer;
-      font-family: 'IBM Plex Sans', sans-serif;
-      transition: background 0.2s;
-    }
-    .toggle-btn:hover { background: rgba(255,255,255,0.2); }
 
-    /* ── LAYOUT ── */
-    .container {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 24px 16px;
+    /* --- THE BRIDGE BANNER --- */
+    #staffInstructionBanner {
+      display: none; background: #ffeb3b; border: 3px solid #fbc02d;
+      padding: 20px; font-weight: bold; color: #000; text-align: center;
+      position: sticky; top: 52px; z-index: 99; animation: pulse 2s infinite;
     }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
-    .two-col {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 20px;
-      align-items: start;
-    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+    .two-col { display: grid; grid-template-columns: 380px 1fr; gap: 24px; }
 
-    @media (max-width: 720px) {
-      .two-col { grid-template-columns: 1fr; }
-    }
-
-    /* ── PANEL ── */
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .panel-header {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; }
     .panel-body { padding: 18px; }
 
-    /* ── FORM ── */
     .form-field { margin-bottom: 14px; }
-    .form-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 5px;
-    }
-    .form-input, .form-select, .form-textarea {
-      width: 100%;
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      font-size: 14px;
-      font-family: 'IBM Plex Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      transition: border-color 0.15s;
-    }
-    .form-input:focus, .form-select:focus, .form-textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    .form-textarea { height: 64px; resize: none; }
+    .form-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-bottom: 5px; display: block; }
+    .form-input, .form-select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px; background: #fafafa; }
 
-    /* floor selector */
-    .floor-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .floor-btn {
-      padding: 5px 12px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      background: var(--bg);
-      font-family: 'IBM Plex Sans', sans-serif;
-      transition: all 0.15s;
-    }
-    .floor-btn.selected {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
+    .sos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .sos-btn { padding: 15px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; transition: 0.1s; }
+    .sos-btn:active { transform: scale(0.95); }
+    .sos-btn.fire { background: var(--fire); }
+    .sos-btn.medical { background: var(--medical); }
+    .sos-btn.security { background: var(--security); }
 
-    /* ── SOS BUTTONS ── */
-    .sos-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-      margin-top: 4px;
-    }
-    .sos-btn {
-      padding: 14px 8px;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: 'IBM Plex Sans', sans-serif;
-      letter-spacing: 0.03em;
-      transition: opacity 0.15s, transform 0.1s;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-    .sos-btn:hover { opacity: 0.88; }
-    .sos-btn:active { transform: scale(0.97); }
-    .sos-btn .icon { font-size: 20px; }
-    .sos-btn.fire { background: var(--fire); color: white; }
-    .sos-btn.medical { background: var(--medical); color: white; }
-    .sos-btn.security { background: #7f6000; color: white; }
+    /* --- ALERTS --- */
+    .alert-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 15px; background: white; }
+    .alert-card-header { padding: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .alert-card-header.fire { border-left: 6px solid var(--fire); background: var(--fire-bg); }
+    .alert-card-header.medical { border-left: 6px solid var(--medical); background: var(--medical-bg); }
+    .alert-card-header.security { border-left: 6px solid var(--security); background: var(--security-bg); }
 
-    /* ── LANG SELECTOR ── */
-    .lang-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .lang-chip {
-      padding: 4px 10px;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 12px;
-      cursor: pointer;
-      background: var(--bg);
-      transition: all 0.15s;
-    }
-    .lang-chip.selected {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
+    .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    .status-ongoing { background: #fee2e2; color: #b91c1c; }
+    .status-resolved { background: #dcfce7; color: #15803d; }
 
-    /* ── STATUS BAR ── */
-    #statusBar {
-      margin: 14px 0;
-      padding: 10px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      display: none;
-      border-left: 3px solid;
-    }
-    #statusBar.info { background: #eef4fb; border-color: var(--medical); color: var(--medical); display: block; }
-    #statusBar.error { background: var(--fire-bg); border-color: var(--fire); color: var(--fire); display: block; }
-    #statusBar.success { background: #edf7f2; border-color: var(--resolved); color: var(--resolved); display: block; }
+    .action-row { display: flex; gap: 8px; padding: 12px; background: #fafafa; border-top: 1px solid var(--border); }
+    .btn-small { padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; background: white; }
 
-    /* ── AI PANEL ── */
-    #aiPanel {
-      display: none;
-      margin-top: 14px;
-    }
-    #aiPanel.visible { display: block; }
-    .ai-box {
-      background: #f8f7f4;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 14px;
-    }
-    .ai-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .ai-label::before {
-      content: '';
-      display: inline-block;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #27ae60;
-    }
-    .ai-steps { list-style: none; }
-    .ai-steps li {
-      padding: 6px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-      display: flex;
-      gap: 8px;
-    }
-    .ai-steps li:last-child { border-bottom: none; }
-    .step-num {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      min-width: 20px;
-      margin-top: 1px;
-    }
-    .ai-translation {
-      margin-top: 10px;
-      padding: 10px;
-      background: white;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      font-size: 13px;
-    }
-    .trans-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-
-    /* ── ALERT CARDS ── */
-    .alert-count {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      background: #e74c3c;
-      color: white;
-      padding: 2px 7px;
-      border-radius: 10px;
-    }
-    .alert-card {
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      margin-bottom: 12px;
-      overflow: hidden;
-      transition: box-shadow 0.2s;
-    }
-    .alert-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
-    .alert-card-header {
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-    }
-    .alert-card-header.fire { background: var(--fire-bg); border-left: 4px solid var(--fire); }
-    .alert-card-header.medical { background: var(--medical-bg); border-left: 4px solid var(--medical); }
-    .alert-card-header.security { background: var(--security-bg); border-left: 4px solid var(--security); }
-    .alert-type {
-      font-weight: 600;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .alert-meta {
-      font-size: 11px;
-      color: var(--muted);
-      font-family: 'IBM Plex Mono', monospace;
-    }
-    .alert-card-body { padding: 12px 14px; }
-    .alert-row {
-      display: flex;
-      gap: 16px;
-      font-size: 13px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-    .alert-kv { display: flex; flex-direction: column; }
-    .alert-kv .k {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .alert-kv .v { font-size: 13px; font-weight: 500; }
-    .status-badge {
-      display: inline-block;
-      padding: 2px 9px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-    .status-ongoing { background: #fde8e8; color: var(--ongoing); }
-    .status-controlled { background: #fef3e2; color: var(--controlled); }
-    .status-resolved { background: #e6f4ec; color: var(--resolved); }
-
-    .alert-steps {
-      background: #f8f7f4;
-      border-radius: 4px;
-      padding: 10px 12px;
-      margin: 8px 0;
-    }
-    .alert-steps-title {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .alert-steps ol { padding-left: 16px; }
-    .alert-steps ol li { font-size: 12px; padding: 2px 0; }
-
-    .alert-msg {
-      font-size: 13px;
-      padding: 8px 10px;
-      background: #fff8f7;
-      border: 1px solid #f5d0cc;
-      border-radius: 4px;
-      margin: 8px 0;
-      color: var(--fire);
-    }
-    .alert-translation {
-      font-size: 12px;
-      padding: 7px 10px;
-      background: #f0f7ff;
-      border: 1px solid #c8dff5;
-      border-radius: 4px;
-      margin: 6px 0;
-      color: #1a5a90;
-    }
-
-    .action-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-    .action-btn {
-      padding: 5px 12px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      font-family: 'IBM Plex Sans', sans-serif;
-      background: white;
-      transition: background 0.15s;
-    }
-    .action-btn:hover { background: var(--bg); }
-    .action-btn.confirm { background: #e6f4ec; border-color: #a8d5bc; color: var(--resolved); }
-    .action-btn.ongoing { background: #fde8e8; border-color: #f5b7b1; color: var(--ongoing); }
-    .action-btn.controlled { background: #fef3e2; border-color: #f5d88e; color: var(--controlled); }
-    .action-btn.resolved { background: #e6f4ec; border-color: #a8d5bc; color: var(--resolved); }
-
-    .speak-btn {
-      padding: 5px 12px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      font-size: 12px;
-      cursor: pointer;
-      font-family: 'IBM Plex Sans', sans-serif;
-      background: white;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    /* ── FLOOR MAP ── */
-    .floor-map-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      margin-top: 20px;
-    }
-    .floor-map-body { padding: 16px; }
-    #floorCanvas {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      cursor: crosshair;
-      display: block;
-    }
-    .map-legend {
-      display: flex;
-      gap: 12px;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .legend-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-
-    /* ── EMPTY STATE ── */
-    .empty-state {
-      padding: 40px 20px;
-      text-align: center;
-      color: var(--muted);
-    }
-    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
-    .empty-state p { font-size: 13px; }
-
-    /* ── SPINNER ── */
-    .spinner {
-      display: inline-block;
-      width: 12px; height: 12px;
-      border: 2px solid rgba(0,0,0,0.15);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── ACCESSIBILITY ── */
-    .a11y-bar {
-      background: #1a1a1a;
-      color: white;
-      padding: 8px 24px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-    }
-    .a11y-btn {
-      padding: 4px 10px;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      border-radius: 4px;
-      font-size: 11px;
-      cursor: pointer;
-      font-family: 'IBM Plex Sans', sans-serif;
-    }
+    @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
   </style>
 </head>
-
 <body>
 
-<!-- TOP BAR -->
 <div class="topbar">
-  <div class="topbar-left">
-    <div class="topbar-logo">Stay<span>Safe</span></div>
-    <div class="topbar-tag">CRISIS RESPONSE</div>
-  </div>
-  <div class="topbar-right">
+  <div class="topbar-logo">Stay<span>Safe</span></div>
+  <div style="display:flex; align-items:center; gap:15px;">
     <div class="mode-pill" id="modePill">Guest Mode</div>
-    <button class="toggle-btn" onclick="toggleStaff()">Switch Mode</button>
+    <button class="btn-small" style="background:transparent; color:white; border-color:rgba(255,255,255,0.3);" onclick="toggleStaff()">Switch Mode</button>
   </div>
 </div>
 
-<!-- ACCESSIBILITY BAR -->
-<div class="a11y-bar">
-  <span>♿ Accessibility:</span>
-  <button class="a11y-btn" onclick="speakLatestAlert()">🔊 Read Latest Alert</button>
-  <button class="a11y-btn" onclick="increaseFontSize()">A+</button>
-  <button class="a11y-btn" onclick="decreaseFontSize()">A−</button>
+<div id="staffInstructionBanner">
+  ⚠️ EMERGENCY INSTRUCTION: <span id="instructionText">Awaiting updates...</span>
 </div>
 
 <div class="container">
   <div class="two-col">
-
-    
-
-    <!-- LEFT: REPORT PANEL -->
-    <div>
+    <div id="reportingSide">
       <div class="panel">
-        <div class="panel-header">
-          Report Emergency
-          <span style="font-size:11px;color:#27ae60;font-weight:500;">● System Active</span>
-        </div>
+        <div class="panel-header">Create Emergency Report</div>
         <div class="panel-body">
           <div class="form-field">
-  <label class="form-label">Photo Evidence</label>
-  <input type="file" id="photoUpload" accept="image/*" capture="environment" class="form-input">
-</div>
-
-<div id="staffInstructionBanner" style="display:none; background:#ffeb3b; border:2px solid #fbc02d; padding:15px; border-radius:8px; margin-bottom:20px; font-weight:bold; color:#000; text-align:center;">
-    ⚠️ MESSAGE FROM STAFF: <span id="instructionText"></span>
-</div>
-
-          <!-- Language Selector -->
-          <div class="form-field">
-            <label class="form-label">Your Language</label>
-            <div class="lang-row" id="langRow">
-              <div class="lang-chip selected" data-lang="en" onclick="selectLang(this)">English</div>
-              <div class="lang-chip" data-lang="hi" onclick="selectLang(this)">हिंदी</div>
-              <div class="lang-chip" data-lang="fr" onclick="selectLang(this)">Français</div>
-              <div class="lang-chip" data-lang="ar" onclick="selectLang(this)">العربية</div>
-              <div class="lang-chip" data-lang="zh" onclick="selectLang(this)">中文</div>
-              <div class="lang-chip" data-lang="es" onclick="selectLang(this)">Español</div>
+            <label class="form-label">Location (Floor & Room)</label>
+            <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
+              <select class="form-select" id="floorSelect">
+                <option value="G">G</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              </select>
+              <input class="form-input" id="location" placeholder="e.g. Room 204 or Lobby">
             </div>
           </div>
 
-          <!-- Floor Selector -->
           <div class="form-field">
-            <label class="form-label">Floor</label>
-            <div class="floor-row" id="floorRow">
-              <div class="floor-btn selected" data-floor="G" onclick="selectFloor(this)">G</div>
-              <div class="floor-btn" data-floor="1" onclick="selectFloor(this)">1</div>
-              <div class="floor-btn" data-floor="2" onclick="selectFloor(this)">2</div>
-              <div class="floor-btn" data-floor="3" onclick="selectFloor(this)">3</div>
-              <div class="floor-btn" data-floor="4" onclick="selectFloor(this)">4</div>
-              <div class="floor-btn" data-floor="5" onclick="selectFloor(this)">5</div>
-            </div>
-          </div>
-
-          <!-- Location -->
-          <div class="form-field">
-            <label class="form-label">Room / Area</label>
-            <input class="form-input" id="location" placeholder="e.g. Room 204, Lobby, Pool Area">
-          </div>
-
-          <!-- Priority -->
-          <div class="form-field">
-            <label class="form-label">Priority</label>
+            <label class="form-label">Priority Level</label>
             <select class="form-select" id="priority">
-              <option value="HIGH">High — Life threatening</option>
-              <option value="MEDIUM">Medium — Urgent attention</option>
-              <option value="LOW">Low — Non-urgent</option>
+              <option value="HIGH">High (Life Threatening)</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
             </select>
           </div>
 
-          <!-- Message -->
           <div class="form-field">
-            <label class="form-label">Message (Optional — any language)</label>
-            <textarea class="form-textarea" id="message" placeholder="Describe the situation..."></textarea>
+            <label class="form-label">Evidence (Take Photo)</label>
+            <input type="file" id="photoUpload" accept="image/*" capture="environment" class="form-input">
           </div>
 
-          <!-- Status Bar -->
-          <div id="statusBar"></div>
-
-          <!-- SOS Buttons -->
           <div class="sos-grid">
-            <button class="sos-btn fire" onclick="handleEmergency('Fire')">
-              <span class="icon">🔥</span>Fire
-            </button>
-            <button class="sos-btn medical" onclick="handleEmergency('Medical')">
-              <span class="icon">🚑</span>Medical
-            </button>
-            <button class="sos-btn security" onclick="handleEmergency('Security')">
-              <span class="icon">🛡️</span>Security
-            </button>
-          </div>
-
-          <!-- AI Action Panel (shows after alert) -->
-          <div id="aiPanel">
-            <div class="ai-box">
-              <div class="ai-label">Gemini — Suggested Protocol</div>
-              <ul class="ai-steps" id="aiSteps"></ul>
-              <div id="aiTranslation"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Floor Map -->
-      <div class="floor-map-panel">
-        <div class="panel-header">
-          Floor Map — <span id="mapFloorLabel">Ground Floor</span>
-        </div>
-        <div class="floor-map-body">
-          <canvas id="floorCanvas" width="340" height="200"></canvas>
-          <div class="map-legend">
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#e74c3c"></div> Fire alert
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#1a6fb0"></div> Medical alert
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#b58a00"></div> Security alert
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#27ae60"></div> Exit
-            </div>
+            <button class="sos-btn fire" onclick="handleEmergency('Fire')">🔥 Fire</button>
+            <button class="sos-btn medical" onclick="handleEmergency('Medical')">🚑 Medical</button>
+            <button class="sos-btn security" onclick="handleEmergency('Security')">🛡️ Security</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT: LIVE ALERTS -->
     <div>
       <div class="panel">
         <div class="panel-header">
-          Live Emergencies
-          <span class="alert-count" id="alertCount">0</span>
+          Active Incidents 
+          <span id="incidentCount" style="background:red; color:white; padding:2px 8px; border-radius:10px; font-size:10px;">0</span>
         </div>
         <div class="panel-body" id="alertList">
-          <div class="empty-state">
-            <div class="icon">📋</div>
-            <p>No active emergencies.<br>System is monitoring.</p>
           </div>
-        </div>
       </div>
     </div>
-
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════ SCRIPTS ════════════════════════════════════════ -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, addDoc, collection, onSnapshot, doc, updateDoc, query, orderBy }
-  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore, addDoc, collection, onSnapshot, doc, updateDoc, query, orderBy } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// ── REPLACE THESE WITH YOUR FIREBASE CONFIG ──
-const firebaseConfig = {
-  apiKey: "AIzaSyBFqSj13pDUioDbRj-cfUPQg-YnSrn5bPw",
-  authDomain: "staysafe-17243.firebaseapp.com",
-  projectId: "staysafe-17243",
-  storageBucket: "staysafe-17243.firebasestorage.app",
-  messagingSenderId: "549075698004",
-  appId: "1:549075698004:web:d86790f1dcf1d744ea08c1"
-};
-// ─────────────────────────────────────────────
+  // --- 1. CONFIG (PASTE YOUR ACTUAL FIREBASE KEYS HERE) ---
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+  };
 
-// ── REPLACE WITH YOUR GEMINI API KEY ──
-const GEMINI_API_KEY = "AIzaSyB9lBy1tSZdvKS2VpD_S3kBe_xp85XpQWs";
-// ──────────────────────────────────────
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+  // --- 2. GLOBAL STATE ---
+  let isStaff = false;
+  let dataCache = [];
+  let myReportId = null;
 
-let isStaff    = false;
-let dataCache  = [];
-let selectedLang  = "en";
-let selectedFloor = "G";
-let baseFontSize  = 14;
+  // --- 3. CORE LOGIC ---
 
-const LANG_NAMES = {
-  en: "English", hi: "Hindi", fr: "French",
-  ar: "Arabic",  zh: "Chinese", es: "Spanish"
-};
+  window.toggleStaff = () => {
+    isStaff = !isStaff;
+    const pill = document.getElementById('modePill');
+    pill.textContent = isStaff ? "Staff Mode" : "Guest Mode";
+    pill.className = "mode-pill" + (isStaff ? " active" : "");
+    render();
+  };
 
-const FLOOR_NAMES = {
-  G: "Ground Floor", 1:"Floor 1", 2:"Floor 2",
-  3:"Floor 3", 4:"Floor 4", 5:"Floor 5"
-};
+  window.handleEmergency = async (type) => {
+    const locName = document.getElementById('location').value;
+    const prio = document.getElementById('priority').value;
+    
+    if (!locName) return alert("Please enter a location");
 
-/* ════ UI HELPERS ════ */
-function showStatus(msg, type="info") {
-  const bar = document.getElementById("statusBar");
-  bar.innerHTML = msg;
-  bar.className = type;
-  if (type !== "info") setTimeout(() => { bar.className = ""; bar.innerHTML = ""; }, 4000);
-}
+    try {
+      const docRef = await addDoc(collection(db, "emergencies"), {
+        type,
+        location: locName,
+        priority: prio,
+        floor: document.getElementById('floorSelect').value,
+        status: "ongoing",
+        time: new Date().toISOString(),
+        staffInstruction: "" // The Bridge field
+      });
 
-window.selectLang = function(el) {
-  document.querySelectorAll(".lang-chip").forEach(c => c.classList.remove("selected"));
-  el.classList.add("selected");
-  selectedLang = el.dataset.lang;
-};
+      myReportId = docRef.id;
+      alert("Report sent. Watch the top of your screen for staff instructions.");
+      document.getElementById('location').value = "";
+      
+      // Start listening for instructions for THIS specific guest
+      listenForBridge(myReportId);
+    } catch (e) { alert("Error: " + e.message); }
+  };
 
-window.selectFloor = function(el) {
-  document.querySelectorAll(".floor-btn").forEach(b => b.classList.remove("selected"));
-  el.classList.add("selected");
-  selectedFloor = el.dataset.floor;
-  document.getElementById("mapFloorLabel").textContent = FLOOR_NAMES[selectedFloor] || `Floor ${selectedFloor}`;
-  drawFloorMap();
-};
-
-window.toggleStaff = function() {
-  isStaff = !isStaff;
-  const pill = document.getElementById("modePill");
-  pill.textContent = isStaff ? "Staff Mode" : "Guest Mode";
-  pill.className = "mode-pill" + (isStaff ? " active" : "");
-  render();
-};
-
-window.increaseFontSize = function() {
-  baseFontSize = Math.min(baseFontSize + 2, 20);
-  document.body.style.fontSize = baseFontSize + "px";
-};
-window.decreaseFontSize = function() {
-  baseFontSize = Math.max(baseFontSize - 2, 12);
-  document.body.style.fontSize = baseFontSize + "px";
-};
-
-/* ════ FLOOR MAP CANVAS ════ */
-function drawFloorMap() {
-  const canvas = document.getElementById("floorCanvas");
-  const ctx    = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-
-  ctx.clearRect(0, 0, W, H);
-
-  // background
-  ctx.fillStyle = "#f8f7f4";
-  ctx.fillRect(0, 0, W, H);
-
-  // Rooms grid
-  const rooms = [
-    {x:20,y:20,w:80,h:60,label:"101"},
-    {x:110,y:20,w:80,h:60,label:"102"},
-    {x:200,y:20,w:80,h:60,label:"103"},
-    {x:290,y:20,w:45,h:60,label:"Lift"},
-    {x:20,y:120,w:80,h:60,label:"102A"},
-    {x:110,y:120,w:80,h:60,label:"Restaurant"},
-    {x:200,y:120,w:80,h:60,label:"Lobby"},
-    {x:290,y:120,w:45,h:60,label:"Exit"},
-  ];
-
-  rooms.forEach(r => {
-    ctx.fillStyle = "#fff";
-    ctx.strokeStyle = "#ddd8d0";
-    ctx.lineWidth = 1;
-    ctx.fillRect(r.x, r.y, r.w, r.h);
-    ctx.strokeRect(r.x, r.y, r.w, r.h);
-
-    ctx.fillStyle = "#6b6860";
-    ctx.font = "10px IBM Plex Mono, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(r.label, r.x + r.w/2, r.y + r.h/2 + 4);
-  });
-
-  // Exit markers
-  ctx.fillStyle = "#27ae60";
-  ctx.beginPath();
-  ctx.arc(312, 150, 6, 0, Math.PI*2);
-  ctx.fill();
-
-  // Plot active alerts on this floor
-  const floorAlerts = dataCache.filter(d =>
-    d.floor === selectedFloor && d.status !== "resolved"
-  );
-  floorAlerts.forEach(d => {
-    const color = d.type==="Fire" ? "#e74c3c" : d.type==="Medical" ? "#1a6fb0" : "#b58a00";
-    const px = d.mapX || 150, py = d.mapY || 100;
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(px, py, 8, 0, Math.PI*2);
-    ctx.fill();
-
-    // pulse ring
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.3;
-    ctx.beginPath();
-    ctx.arc(px, py, 14, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  });
-}
-
-drawFloorMap();
-setInterval(drawFloorMap, 2000); // re-draw every 2s for pulse effect
-
-/* ════ GEMINI API ════ */
-async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    })
-  });
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-}
-
-async function getGeminiActionPlan(type, floor, location) {
-  const prompt = `You are a hotel emergency coordinator. An emergency has been reported.
-
-Emergency type: ${type}
-Floor: ${floor}
-Location: ${location}
-
-Give exactly 4 numbered steps for hotel staff to take RIGHT NOW. Be very specific to a hotel environment. Keep each step under 12 words. Plain text only, no markdown, no asterisks. Output format:
-1. Step one
-2. Step two
-3. Step three
-4. Step four`;
-
-  return callGemini(prompt);
-}
-
-async function translateMessage(text, targetLang) {
-  if (!text || targetLang === "en") return null;
-  const prompt = `Translate this emergency message to English. Return only the English translation, nothing else: "${text}"`;
-  return callGemini(prompt);
-}
-
-async function getGuestInstructions(type, guestLang) {
-  if (guestLang === "en") return null;
-  const langName = LANG_NAMES[guestLang] || guestLang;
-  const prompt = `You are a hotel safety system. An emergency type "${type}" has been reported.
-Write 3 short safety instructions for the hotel guest in ${langName}. 
-Keep each instruction under 10 words. Plain text, numbered list. No English translation.`;
-  return callGemini(prompt);
-}
-
-/* ════ HANDLE EMERGENCY ════ */
-  // 1. Update handleEmergency to include a placeholder for instructions
-window.handleEmergency = async (type) => {
-  const locName = document.getElementById('location').value;
-  const prio = document.getElementById('priority').value;
-  if (!locName) return alert("Please enter a location");
-
-  const docRef = await addDoc(collection(db, "emergencies"), {
-    type,
-    location: locName,
-    priority: prio,
-    floor: document.getElementById('floorSelect').value,
-    status: "ongoing",
-    time: new Date().toISOString(),
-    reports: 1,
-    staffInstruction: "" // Placeholder for the 'Bridge'
-  });
-
-  // Start listening for instructions for THIS specific report
-  listenForStaffReplies(docRef.id);
-  document.getElementById('location').value = "";
-};
-
-// 2. New function to show messages to the guest
-function listenForStaffReplies(reportId) {
-  const docRef = doc(db, "emergencies", reportId);
-  onSnapshot(docRef, (doc) => {
-    const data = doc.data();
-    if (data && data.staffInstruction) {
+  function listenForBridge(id) {
+    onSnapshot(doc(db, "emergencies", id), (doc) => {
+      const data = doc.data();
       const banner = document.getElementById('staffInstructionBanner');
       const text = document.getElementById('instructionText');
-      text.textContent = data.staffInstruction;
-      banner.style.display = 'block';
-      // Auto-scroll to top so guest sees the instruction
-      window.scrollTo({top: 0, behavior: 'smooth'});
-    }
-  });
-}
-
-
-  
-window.handleEmergency = async function(type) {
-  const location = document.getElementById("location").value.trim();
-  const priority = document.getElementById("priority").value;
-  const message  = document.getElementById("message").value.trim();
-  const floor    = selectedFloor;
-  const lang     = selectedLang;
-
-  if (!location) {
-    showStatus("⚠️ Please enter your room or area.", "error");
-    return;
+      
+      if (data && data.staffInstruction) {
+        text.textContent = data.staffInstruction;
+        banner.style.display = 'block';
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      }
+    });
   }
-
-  const duplicate = dataCache.find(d =>
-    d.type === type && d.floor === floor && d.location === location && d.status !== "resolved"
-  );
-  if (duplicate) {
-    showStatus("Already reported from this location. Tap Confirm on the alert.", "error");
-    return;
-  }
-
-  showStatus(`<span class="spinner"></span> Sending alert & generating protocol…`, "info");
-
 
   window.sendInstruction = async (id) => {
-  const input = document.getElementById(`ins_${id}`);
-  const message = input.value;
-  if (!message) return alert("Type a message first");
-  
-  await updateDoc(doc(db, "emergencies", id), {
-    staffInstruction: message
-  });
-  alert("Instruction sent to guest.");
-  input.value = "";
-};
+    const input = document.getElementById(`ins_${id}`);
+    if (!input.value) return alert("Type a message first");
 
-  // Random map position within canvas bounds
-  const mapX = Math.floor(Math.random() * 280) + 30;
-  const mapY = Math.floor(Math.random() * 140) + 30;
-
-  // Save to Firebase immediately
-  const docRef = await addDoc(collection(db, "emergencies"), {
-    type, location, floor, priority, message, lang,
-    status: "ongoing", reports: 1,
-    time: new Date().toISOString(),
-    mapX, mapY,
-    actionPlan: null,
-    translatedMessage: null,
-    guestInstructions: null,
-  });
-
-  // AI calls in parallel
-  try {
-    const [actionPlanRaw, translatedMsg, guestInstr] = await Promise.all([
-      getGeminiActionPlan(type, floor, location),
-      translateMessage(message, lang),
-      getGuestInstructions(type, lang),
-    ]);
-
-    // Parse steps from Gemini response
-    const steps = actionPlanRaw
-      .split("\n")
-      .filter(l => /^\d\./.test(l.trim()))
-      .map(l => l.replace(/^\d\.\s*/, "").trim())
-      .slice(0, 4);
-
-    // Update Firestore doc with AI data
-    await updateDoc(doc(db, "emergencies", docRef.id), {
-      actionPlan: steps,
-      translatedMessage: translatedMsg || null,
-      guestInstructions: guestInstr || null,
+    await updateDoc(doc(db, "emergencies", id), {
+      staffInstruction: input.value
     });
+    alert("Safety instruction sent to Guest.");
+    input.value = "";
+  };
 
-    // Show in form panel
-    showAiPanel(steps, translatedMsg, guestInstr, lang);
-    showStatus("✓ Alert sent. Protocol generated by Gemini.", "success");
+  window.updateStatus = async (id, status) => {
+    await updateDoc(doc(db, "emergencies", id), { status });
+  };
 
-  } catch(e) {
-    showStatus("✓ Alert sent. AI protocol unavailable right now.", "success");
-    console.error("Gemini error:", e);
-  }
+  // --- 4. UI RENDERING ---
 
-  document.getElementById("message").value = "";
-};
+  function render() {
+    const list = document.getElementById('alertList');
+    if (dataCache.length === 0) {
+      list.innerHTML = `<p style="text-align:center; color:grey; padding:40px;">System standby. No active reports.</p>`;
+      return;
+    }
 
-function showAiPanel(steps, translatedMsg, guestInstr, lang) {
-  const panel = document.getElementById("aiPanel");
-  const stepsEl = document.getElementById("aiSteps");
-  const transEl = document.getElementById("aiTranslation");
-
-  stepsEl.innerHTML = steps.length
-    ? steps.map((s, i) => `<li><span class="step-num">0${i+1}</span>${s}</li>`).join("")
-    : "<li>Protocol not available</li>";
-
-  let transHtml = "";
-  if (translatedMsg) {
-    transHtml += `<div class="ai-translation">
-      <div class="trans-label">Guest message (translated)</div>
-      ${translatedMsg}
-    </div>`;
-  }
-  if (guestInstr) {
-    transHtml += `<div class="ai-translation" style="margin-top:6px">
-      <div class="trans-label">Guest instructions (${LANG_NAMES[lang] || lang})</div>
-      ${guestInstr}
-    </div>`;
-  }
-  transEl.innerHTML = transHtml;
-  panel.classList.add("visible");
-}
-
-/* ════ TIME HELPER ════ */
-function getTimeAgo(time) {
-  const diff = (Date.now() - new Date(time)) / 1000;
-  if (diff < 60)   return "just now";
-  if (diff < 3600) return Math.floor(diff/60) + " min ago";
-  return Math.floor(diff/3600) + " hr ago";
-}
-
-/* ════ ACCESSIBILITY — SPEAK ALERT ════ */
-window.speakLatestAlert = function() {
-  if (!dataCache.length) { speechSynthesis.speak(new SpeechSynthesisUtterance("No active emergencies.")); return; }
-  const d = dataCache[0];
-  const msg = `Emergency alert. ${d.type} emergency. Floor ${d.floor}. Location: ${d.location}. Priority: ${d.priority}. Status: ${d.status}.`;
-  const utt = new SpeechSynthesisUtterance(msg);
-  utt.rate = 0.9;
-  speechSynthesis.speak(utt);
-};
-
-window.speakAlert = function(id) {
-  const d = dataCache.find(x => x.id === id);
-  if (!d) return;
-  const msg = `${d.type} emergency on floor ${d.floor} at ${d.location}. Priority ${d.priority}. Current status: ${d.status}.`;
-  const utt = new SpeechSynthesisUtterance(msg);
-  utt.rate = 0.9;
-  speechSynthesis.speak(utt);
-};
-
-/* ════ FIREBASE LISTENER ════ */
-const q = query(collection(db, "emergencies"), orderBy("time", "desc"));
-
-onSnapshot(q, snap => {
-  dataCache = [];
-  snap.forEach(d => dataCache.push({ id: d.id, ...d.data() }));
-  render();
-  drawFloorMap();
-  document.getElementById("alertCount").textContent =
-    dataCache.filter(d => d.status !== "resolved").length;
-});
-
-/* ════ RENDER ALERTS ════ */
-function render() {
-
-  // Inside your render() function, locate the 'isStaff' section of the template:
-${isStaff ? `
-  <div style="margin-top:10px;">
-    <input type="text" id="ins_${d.id}" placeholder="Send instruction to guest..." class="form-input" style="font-size:12px;">
-    <button class="btn-small" style="margin-top:5px; width:100%; background:var(--accent); color:white;" 
-      onclick="sendInstruction('${d.id}')">📢 Send Instruction</button>
-  </div>
-  <hr style="margin:10px 0;">
-  <button class="btn-small" onclick="updateStatus('${d.id}', 'resolved')">✅ Resolve</button>
-` : `
-  <button class="btn-small">👍 I see this too</button>
-`}
-
-  
-  const list = document.getElementById("alertList");
-
-  if (!dataCache.length) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>No active emergencies.<br>System is monitoring.</p></div>`;
-    return;
-  }
-
-  list.innerHTML = dataCache.map(d => {
-    const typeClass = d.type.toLowerCase();
-    const typeIcon  = d.type==="Fire" ? "🔥" : d.type==="Medical" ? "🚑" : "🛡️";
-    const statusClass = d.status==="ongoing" ? "status-ongoing"
-                      : d.status==="under control" ? "status-controlled"
-                      : "status-resolved";
-
-    const stepsHtml = d.actionPlan?.length
-      ? `<div class="alert-steps">
-          <div class="alert-steps-title">Gemini Protocol</div>
-          <ol>${d.actionPlan.map(s => `<li>${s}</li>`).join("")}</ol>
-        </div>`
-      : `<div class="alert-steps">
-          <div class="alert-steps-title">Protocol</div>
-          <ol>${defaultSteps(d.type).map(s=>`<li>${s}</li>`).join("")}</ol>
-        </div>`;
-
-    const msgHtml = d.message
-      ? `<div class="alert-msg">💬 ${d.message}</div>`
-      : "";
-
-    const transHtml = d.translatedMessage
-      ? `<div class="alert-translation">🌐 Translation: ${d.translatedMessage}</div>`
-      : "";
-
-    const guestHtml = d.guestInstructions && isStaff
-      ? `<div class="alert-translation">📢 Guest instructions (${LANG_NAMES[d.lang]||d.lang}): ${d.guestInstructions}</div>`
-      : "";
-
-    const staffActions = isStaff ? `
-      <button class="action-btn ongoing"    onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
-      <button class="action-btn controlled" onclick="updateStatus('${d.id}','under control')">Under Control</button>
-      <button class="action-btn resolved"   onclick="updateStatus('${d.id}','resolved')">Resolved</button>
-    ` : `<button class="action-btn confirm" onclick="confirmAlert('${d.id}',${d.reports||1})">👍 Confirm (${d.reports||1})</button>`;
-
-    return `<div class="alert-card">
-      <div class="alert-card-header ${typeClass}">
-        <div class="alert-type">${typeIcon} ${d.type} — Floor ${d.floor||"?"}</div>
-        <div class="alert-meta">${getTimeAgo(d.time)}</div>
-      </div>
-      <div class="alert-card-body">
-        <div class="alert-row">
-          <div class="alert-kv"><span class="k">Location</span><span class="v">${d.location}</span></div>
-          <div class="alert-kv"><span class="k">Priority</span><span class="v">${d.priority}</span></div>
-          <div class="alert-kv"><span class="k">Reports</span><span class="v">${d.reports||1}</span></div>
-          <div class="alert-kv"><span class="k">Status</span><span class="v"><span class="status-badge ${statusClass}">${d.status}</span></span></div>
+    list.innerHTML = dataCache.map(d => {
+      const statusClass = d.status === 'resolved' ? 'status-resolved' : 'status-ongoing';
+      const typeClass = d.type.toLowerCase();
+      
+      return `
+        <div class="alert-card">
+          <div class="alert-card-header ${typeClass}">
+            <strong>${d.type.toUpperCase()}</strong>
+            <span class="status-badge ${statusClass}">${d.status}</span>
+          </div>
+          <div class="panel-body">
+            <p>📍 <strong>Location:</strong> Floor ${d.floor}, ${d.location}</p>
+            <p>⚠️ <strong>Priority:</strong> ${d.priority}</p>
+            
+            ${isStaff && d.status !== 'resolved' ? `
+              <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+                <label class="form-label" style="font-size:10px;">Send Instruction to Guest:</label>
+                <input type="text" id="ins_${d.id}" placeholder="e.g. Move to Level 1 lobby" class="form-input">
+                <button class="btn-small" style="width:100%; margin-top:5px; background:var(--accent); color:white;" 
+                  onclick="sendInstruction('${d.id}')">📢 Broadcast to Guest</button>
+              </div>
+            ` : ""}
+          </div>
+          <div class="action-row">
+            ${isStaff && d.status !== 'resolved' ? `
+              <button class="btn-small" onclick="updateStatus('${d.id}', 'resolved')">✅ Mark Resolved</button>
+            ` : ""}
+            ${!isStaff ? `<button class="btn-small" onclick="alert('Confirmed')">👍 I see this too</button>` : ""}
+          </div>
         </div>
-        ${msgHtml}${transHtml}${guestHtml}
-        ${stepsHtml}
-        <div class="action-row">
-          ${staffActions}
-          <button class="speak-btn" onclick="speakAlert('${d.id}')">🔊 Read</button>
-        </div>
-      </div>
-    </div>`;
-  }).join("");
-}
+      `;
+    }).join("");
+  }
 
-function defaultSteps(type) {
-  if (type==="Fire")     return ["Evacuate guests via nearest exit","Activate fire alarm system","Call fire department (101)","Do not use elevators"];
-  if (type==="Medical")  return ["Call ambulance immediately (108)","Provide first aid if trained","Clear area around patient","Meet emergency services at entrance"];
-  return ["Secure the affected area","Alert security team immediately","Do not confront suspects","Document incident details"];
-}
-
-window.confirmAlert = async function(id, count) {
-  await updateDoc(doc(db,"emergencies",id), { reports: count+1 });
-};
-
-window.updateStatus = async function(id, status) {
-  await updateDoc(doc(db,"emergencies",id), { status });
+  // --- 5. DATA SYNC ---
+  const q = query(collection(db, "emergencies"), orderBy("time", "desc"));
+  onSnapshot(q, snap => {
+    dataCache = [];
+    snap.forEach(d => dataCache.push({ id: d.id, ...d.data() }));
+    document.getElementById('incidentCount').textContent = dataCache.filter(x => x.status !== 'resolved').length;
+    render();
+  });
+</script>
+</body>
+</html>
 };
 
 </script>
