@@ -1,233 +1,1325 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>StaySafe - Crisis Response</title>
+  <title>StaySafe Dashboard</title>
 
-<style>
-body {
-  font-family: Arial;
-  margin: 0;
-  background: #f4f4f4;
-}
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #eef2f3, #dfe9f3);
+      text-align: center;
+    }
 
-.topbar {
-  background: #2c3e50;
-  color: white;
-  padding: 10px;
-  display: flex;
-  justify-content: space-between;
-}
+    h1 { color: #333; }
 
-.container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 10px;
-}
+    .btn {
+      padding: 15px 25px;
+      margin: 15px;
+      font-size: 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
 
-.panel {
-  background: white;
-  padding: 10px;
-  border-radius: 8px;
-}
+    .fire { background: #e74c3c; color: white; }
+    .medical { background: #3498db; color: white; }
+    .security { background: #f1c40f; color: black; }
 
-button {
-  margin: 5px;
-  padding: 8px;
-  cursor: pointer;
-}
+    .box {
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      width: 60%;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+      text-align: left;
+    }
 
-.alert {
-  border: 1px solid #ddd;
-  padding: 10px;
-  margin-top: 10px;
-}
+    .small-btn {
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #2c3e50;
+      color: white;
+    }
 
-.fire { color: red; }
-.medical { color: blue; }
-.security { color: orange; }
+    input, select, textarea {
+      padding: 10px;
+      width: 260px;
+      margin-top: 10px;
+    }
 
-canvas {
-  width: 100%;
-  border: 1px solid #ccc;
-}
-</style>
+    textarea { height: 60px; }
+
+    #msgBar {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .msg-normal { color: #2c3e50; }
+    .msg-error { color: #e74c3c; }
+  </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <div>StaySafe</div>
-  <div id="mode">Guest Mode</div>
-</div>
+<h1>StaySafe Dashboard</h1>
 
-<div class="container">
+<button class="small-btn" onclick="toggleStaff()">Toggle Staff Mode</button>
 
-<!-- LEFT -->
-<div class="panel">
-  <h3>Report Emergency</h3>
+<div id="msgBar" class="msg-normal"></div>
 
-  <input id="location" placeholder="Location"><br><br>
+<div id="home">
+  <input id="location" placeholder="Enter Location"><br>
 
   <select id="priority">
-    <option>HIGH</option>
-    <option>MEDIUM</option>
-    <option>LOW</option>
-  </select><br><br>
+    <option value="HIGH">High</option>
+    <option value="MEDIUM">Medium</option>
+    <option value="LOW">Low</option>
+  </select><br>
 
-  <textarea id="message" placeholder="Message"></textarea><br><br>
+  <textarea id="message" placeholder="Add extra message"></textarea><br><br>
 
-  <button onclick="send('Fire')">🔥 Fire</button>
-  <button onclick="send('Medical')">🚑 Medical</button>
-  <button onclick="send('Security')">🛡 Security</button>
-
-  <div id="ai"></div>
+  <button class="btn fire" onclick="handleEmergency('Fire')">Fire</button>
+  <button class="btn medical" onclick="handleEmergency('Medical')">Medical</button>
+  <button class="btn security" onclick="handleEmergency('Security')">Security</button>
 </div>
 
-<!-- RIGHT -->
-<div class="panel">
-  <h3>Live Alerts</h3>
-  <div id="alerts"></div>
-
-  <h3>Floor Map</h3>
-  <canvas id="map" width="300" height="200"></canvas>
-</div>
-
-</div>
+<div id="list"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getFirestore,
-  addDoc,
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  updateDoc,
-  doc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, addDoc, collection, onSnapshot, doc, updateDoc, query, orderBy } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* 🔥 ADD YOUR KEYS HERE */
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_ID"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
 };
 
-const GEMINI_API_KEY = "YOUR_GEMINI_KEY";
-
-/* INIT */
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let data = [];
+let isStaff = false;
+let dataCache = [];
 
-/* GEMINI */
-async function gemini(prompt) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    }
-  );
+function showMsg(text, isError=false){
+  const bar = document.getElementById("msgBar");
+  bar.innerText = text;
+  bar.className = isError ? "msg-error" : "msg-normal";
 
-  const json = await res.json();
-  return json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  setTimeout(()=>{ bar.innerText=""; },3000);
 }
 
-/* SEND ALERT */
-window.send = async function(type) {
-  const location = document.getElementById("location").value;
-  const message = document.getElementById("message").value;
-  const priority = document.getElementById("priority").value;
-
-  const ref = await addDoc(collection(db,"alerts"), {
-    type,
-    location,
-    message,
-    priority,
-    status:"ongoing",
-    time:Date.now(),
-    x:Math.random()*250,
-    y:Math.random()*150
-  });
-
-  const ai = await gemini(`
-You are hotel emergency AI.
-
-Type: ${type}
-Location: ${location}
-
-Give 4 short steps:
-1.
-2.
-3.
-4.
-`);
-
-  document.getElementById("ai").innerHTML =
-    "<b>AI Plan:</b><br>" + ai.replace(/\n/g,"<br>");
+/* ✅ FIX HERE */
+window.toggleStaff = function(){
+  isStaff = !isStaff;
+  showMsg("Staff Mode: " + (isStaff ? "ON" : "OFF"));
+  render(); // 🔥 IMPORTANT FIX
 };
 
-/* REALTIME */
-onSnapshot(query(collection(db,"alerts"), orderBy("time","desc")), snap=>{
-  data = snap.docs.map(d=>({id:d.id,...d.data()}));
+function getTimeAgo(time){
+  let diff = (Date.now() - new Date(time)) / 1000;
+  if(diff<60) return "Just now";
+  if(diff<3600) return Math.floor(diff/60)+" min ago";
+  return Math.floor(diff/3600)+" hr ago";
+}
+
+function getHelp(type){
+  if(type==="Fire") return "Fire extinguisher near exit";
+  if(type==="Medical") return "First aid at reception";
+  return "Contact security";
+}
+
+function getCoordination(status){
+  if(status==="ongoing") return "Management informed → Staff responding";
+  if(status==="under control") return "Situation under control → Monitoring";
+  if(status==="resolved") return "Issue resolved";
+}
+
+function getSteps(type){
+  if(type==="Fire") return ["Evacuate","Use extinguisher","Call fire service"];
+  if(type==="Medical") return ["Call doctor","Give first aid","Stay nearby"];
+  return ["Alert security","Ensure safety","Control area"];
+}
+
+function getStatusColor(status){
+  if(status==="ongoing") return "red";
+  if(status==="under control") return "orange";
+  if(status==="resolved") return "green";
+  return "black";
+}
+
+const q = query(collection(db,"emergencies"), orderBy("time","desc"));
+
+onSnapshot(q,(snap)=>{
+  dataCache=[];
+  snap.forEach(d=>{
+    dataCache.push({id:d.id,...d.data()});
+  });
   render();
-  draw();
 });
 
-/* RENDER ALERTS */
 function render(){
-  const el = document.getElementById("alerts");
-  el.innerHTML = data.map(d=>`
-    <div class="alert">
-      <b class="${d.type.toLowerCase()}">${d.type}</b><br>
-      ${d.location}<br>
-      ${d.message}<br>
-      Status: ${d.status}<br>
+  document.getElementById("list").innerHTML="<h3 style='color:red'>Live Emergencies</h3>";
 
-      <button onclick="update('${d.id}','controlled')">Control</button>
-      <button onclick="update('${d.id}','resolved')">Resolve</button>
-    </div>
-  `).join("");
-}
+  dataCache.forEach(d=>{
+    document.getElementById("list").innerHTML+=`
+    <div class="box">
+      <b>${d.type}</b><br>
+      Location: ${d.location}<br>
+      Priority: ${d.priority}<br>
+      Reports: ${d.reports || 1}<br>
+      Time: ${getTimeAgo(d.time)}<br>
 
-/* UPDATE */
-window.update = async function(id,status){
-  await updateDoc(doc(db,"alerts",id),{status});
-};
+      <b>Status:</b> <span style="color:${getStatusColor(d.status)}">${d.status}</span><br>
+      <b>Coordination:</b> ${getCoordination(d.status)}<br>
 
-/* FLOOR MAP */
-function draw(){
-  const c = document.getElementById("map");
-  const ctx = c.getContext("2d");
+      <b>Suggested Actions:</b>
+      <ul>${getSteps(d.type).map(s=>`<li>${s}</li>`).join("")}</ul>
 
-  ctx.clearRect(0,0,300,200);
+      <b>Help:</b> ${getHelp(d.type)}<br>
 
-  data.forEach(d=>{
-    if(d.status==="resolved") return;
+      ${d.message ? `<b style="color:red;">Message:</b> <span style="color:red;">${d.message}</span><br>` : ""}
 
-    ctx.fillStyle =
-      d.type==="Fire"?"red":
-      d.type==="Medical"?"blue":"orange";
+      ${!isStaff ? `<button onclick="agree('${d.id}',${d.reports||1})">Confirm</button>` : ""}
 
-    ctx.beginPath();
-    ctx.arc(d.x,d.y,6,0,Math.PI*2);
-    ctx.fill();
+      ${isStaff ? `
+        <button onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
+        <button onclick="updateStatus('${d.id}','under control')">Under Control</button>
+        <button onclick="updateStatus('${d.id}','resolved')">Resolved</button>
+      ` : ""}
+    </div>`;
   });
 }
 
-setInterval(draw,2000);
+window.agree = async function(id,count){
+  await updateDoc(doc(db,"emergencies",id),{
+    reports: count+1
+  });
+};
+
+window.updateStatus = async function(id,status){
+  await updateDoc(doc(db,"emergencies",id),{
+    status: status
+  });
+};
+
+window.handleEmergency = async function(type){
+
+  let location=document.getElementById("location").value;
+  let priority=document.getElementById("priority").value;
+  let message=document.getElementById("message").value;
+
+  let exists = dataCache.find(d=>d.type===type && d.location===location && d.status!=="resolved");
+
+  if(exists){
+    showMsg("Already reported. You can confirm it.", true);
+    return;
+  }
+
+  showMsg("Alert received by management.");
+
+  await addDoc(collection(db,"emergencies"),{
+    type,
+    location,
+    priority,
+    message,
+    status:"ongoing",
+    reports:1,
+    time:new Date().toISOString()
+  });
+
+  document.getElementById("message").value="";
+};
+</script>
+
+</body>   
+</html>  
+
+
+UPDATE CLAUDE
+
+      --ongoing: #c0392b;
+      --controlled: #d07000;
+      --resolved: #2d7a4f;
+      --accent: #2c3e50;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background: var(--accent);
+      color: white;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-logo {
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+    }
+    .topbar-logo span { color: #e74c3c; }
+    .topbar-tag {
+      font-size: 11px;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.08em;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .mode-pill {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+      background: rgba(255,255,255,0.12);
+      color: #ccc;
+      transition: all 0.2s;
+    }
+    .mode-pill.active { background: #e74c3c; color: white; }
+    .toggle-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: background 0.2s;
+    }
+    .toggle-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── LAYOUT ── */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 720px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-body { padding: 18px; }
+
+    /* ── FORM ── */
+    .form-field { margin-bottom: 14px; }
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 5px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color 0.15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .form-textarea { height: 64px; resize: none; }
+
+    /* floor selector */
+    .floor-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .floor-btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      background: var(--bg);
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: all 0.15s;
+    }
+    .floor-btn.selected {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* ── SOS BUTTONS ── */
+    .sos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .sos-btn {
+      padding: 14px 8px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      letter-spacing: 0.03em;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .sos-btn:hover { opacity: 0.88; }
+    .sos-btn:active { transform: scale(0.97); }
+    .sos-btn .icon { font-size: 20px; }
+    .sos-btn.fire { background: var(--fire); color: white; }
+    .sos-btn.medical { background: var(--medical); color: white; }
+    .sos-btn.security { background: #7f6000; color: white; }
+
+    /* ── LANG SELECTOR ── */
+    .lang-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .lang-chip {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      background: var(--bg);
+      transition: all 0.15s;
+    }
+    .lang-chip.selected {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* ── STATUS BAR ── */
+    #statusBar {
+      margin: 14px 0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      display: none;
+      border-left: 3px solid;
+    }
+    #statusBar.info { background: #eef4fb; border-color: var(--medical); color: var(--medical); display: block; }
+    #statusBar.error { background: var(--fire-bg); border-color: var(--fire); color: var(--fire); display: block; }
+    #statusBar.success { background: #edf7f2; border-color: var(--resolved); color: var(--resolved); display: block; }
+
+    /* ── AI PANEL ── */
+    #aiPanel {
+      display: none;
+      margin-top: 14px;
+    }
+    #aiPanel.visible { display: block; }
+    .ai-box {
+      background: #f8f7f4;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .ai-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ai-label::before {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #27ae60;
+    }
+    .ai-steps { list-style: none; }
+    .ai-steps li {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      display: flex;
+      gap: 8px;
+    }
+    .ai-steps li:last-child { border-bottom: none; }
+    .step-num {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      min-width: 20px;
+      margin-top: 1px;
+    }
+    .ai-translation {
+      margin-top: 10px;
+      padding: 10px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .trans-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    /* ── ALERT CARDS ── */
+    .alert-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      background: #e74c3c;
+      color: white;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .alert-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .alert-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+    .alert-card-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .alert-card-header.fire { background: var(--fire-bg); border-left: 4px solid var(--fire); }
+    .alert-card-header.medical { background: var(--medical-bg); border-left: 4px solid var(--medical); }
+    .alert-card-header.security { background: var(--security-bg); border-left: 4px solid var(--security); }
+    .alert-type {
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .alert-meta {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .alert-card-body { padding: 12px 14px; }
+    .alert-row {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .alert-kv { display: flex; flex-direction: column; }
+    .alert-kv .k {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .alert-kv .v { font-size: 13px; font-weight: 500; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .status-ongoing { background: #fde8e8; color: var(--ongoing); }
+    .status-controlled { background: #fef3e2; color: var(--controlled); }
+    .status-resolved { background: #e6f4ec; color: var(--resolved); }
+
+    .alert-steps {
+      background: #f8f7f4;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin: 8px 0;
+    }
+    .alert-steps-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .alert-steps ol { padding-left: 16px; }
+    .alert-steps ol li { font-size: 12px; padding: 2px 0; }
+
+    .alert-msg {
+      font-size: 13px;
+      padding: 8px 10px;
+      background: #fff8f7;
+      border: 1px solid #f5d0cc;
+      border-radius: 4px;
+      margin: 8px 0;
+      color: var(--fire);
+    }
+    .alert-translation {
+      font-size: 12px;
+      padding: 7px 10px;
+      background: #f0f7ff;
+      border: 1px solid #c8dff5;
+      border-radius: 4px;
+      margin: 6px 0;
+      color: #1a5a90;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .action-btn {
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: white;
+      transition: background 0.15s;
+    }
+    .action-btn:hover { background: var(--bg); }
+    .action-btn.confirm { background: #e6f4ec; border-color: #a8d5bc; color: var(--resolved); }
+    .action-btn.ongoing { background: #fde8e8; border-color: #f5b7b1; color: var(--ongoing); }
+    .action-btn.controlled { background: #fef3e2; border-color: #f5d88e; color: var(--controlled); }
+    .action-btn.resolved { background: #e6f4ec; border-color: #a8d5bc; color: var(--resolved); }
+
+    .speak-btn {
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: white;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* ── FLOOR MAP ── */
+    .floor-map-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    .floor-map-body { padding: 16px; }
+    #floorCanvas {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: crosshair;
+      display: block;
+    }
+    .map-legend {
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── SPINNER ── */
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid rgba(0,0,0,0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ACCESSIBILITY ── */
+    .a11y-bar {
+      background: #1a1a1a;
+      color: white;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .a11y-btn {
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">Stay<span>Safe</span></div>
+    <div class="topbar-tag">CRISIS RESPONSE</div>
+  </div>
+  <div class="topbar-right">
+    <div class="mode-pill" id="modePill">Guest Mode</div>
+    <button class="toggle-btn" onclick="toggleStaff()">Switch Mode</button>
+  </div>
+</div>
+
+<!-- ACCESSIBILITY BAR -->
+<div class="a11y-bar">
+  <span>♿ Accessibility:</span>
+  <button class="a11y-btn" onclick="speakLatestAlert()">🔊 Read Latest Alert</button>
+  <button class="a11y-btn" onclick="increaseFontSize()">A+</button>
+  <button class="a11y-btn" onclick="decreaseFontSize()">A−</button>
+</div>
+
+<div class="container">
+  <div class="two-col">
+
+    <!-- LEFT: REPORT PANEL -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          Report Emergency
+          <span style="font-size:11px;color:#27ae60;font-weight:500;">● System Active</span>
+        </div>
+        <div class="panel-body">
+
+          <!-- Language Selector -->
+          <div class="form-field">
+            <label class="form-label">Your Language</label>
+            <div class="lang-row" id="langRow">
+              <div class="lang-chip selected" data-lang="en" onclick="selectLang(this)">English</div>
+              <div class="lang-chip" data-lang="hi" onclick="selectLang(this)">हिंदी</div>
+              <div class="lang-chip" data-lang="fr" onclick="selectLang(this)">Français</div>
+              <div class="lang-chip" data-lang="ar" onclick="selectLang(this)">العربية</div>
+              <div class="lang-chip" data-lang="zh" onclick="selectLang(this)">中文</div>
+              <div class="lang-chip" data-lang="es" onclick="selectLang(this)">Español</div>
+            </div>
+          </div>
+
+          <!-- Floor Selector -->
+          <div class="form-field">
+            <label class="form-label">Floor</label>
+            <div class="floor-row" id="floorRow">
+              <div class="floor-btn selected" data-floor="G" onclick="selectFloor(this)">G</div>
+              <div class="floor-btn" data-floor="1" onclick="selectFloor(this)">1</div>
+              <div class="floor-btn" data-floor="2" onclick="selectFloor(this)">2</div>
+              <div class="floor-btn" data-floor="3" onclick="selectFloor(this)">3</div>
+              <div class="floor-btn" data-floor="4" onclick="selectFloor(this)">4</div>
+              <div class="floor-btn" data-floor="5" onclick="selectFloor(this)">5</div>
+            </div>
+          </div>
+
+          <!-- Location -->
+          <div class="form-field">
+            <label class="form-label">Room / Area</label>
+            <input class="form-input" id="location" placeholder="e.g. Room 204, Lobby, Pool Area">
+          </div>
+
+          <!-- Priority -->
+          <div class="form-field">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="priority">
+              <option value="HIGH">High — Life threatening</option>
+              <option value="MEDIUM">Medium — Urgent attention</option>
+              <option value="LOW">Low — Non-urgent</option>
+            </select>
+          </div>
+
+          <!-- Message -->
+          <div class="form-field">
+            <label class="form-label">Message (Optional — any language)</label>
+            <textarea class="form-textarea" id="message" placeholder="Describe the situation..."></textarea>
+          </div>
+
+          <!-- Status Bar -->
+          <div id="statusBar"></div>
+
+          <!-- SOS Buttons -->
+          <div class="sos-grid">
+            <button class="sos-btn fire" onclick="handleEmergency('Fire')">
+              <span class="icon">🔥</span>Fire
+            </button>
+            <button class="sos-btn medical" onclick="handleEmergency('Medical')">
+              <span class="icon">🚑</span>Medical
+            </button>
+            <button class="sos-btn security" onclick="handleEmergency('Security')">
+              <span class="icon">🛡️</span>Security
+            </button>
+          </div>
+
+          <!-- AI Action Panel (shows after alert) -->
+          <div id="aiPanel">
+            <div class="ai-box">
+              <div class="ai-label">Gemini — Suggested Protocol</div>
+              <ul class="ai-steps" id="aiSteps"></ul>
+              <div id="aiTranslation"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Floor Map -->
+      <div class="floor-map-panel">
+        <div class="panel-header">
+          Floor Map — <span id="mapFloorLabel">Ground Floor</span>
+        </div>
+        <div class="floor-map-body">
+          <canvas id="floorCanvas" width="340" height="200"></canvas>
+          <div class="map-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#e74c3c"></div> Fire alert
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#1a6fb0"></div> Medical alert
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#b58a00"></div> Security alert
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#27ae60"></div> Exit
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: LIVE ALERTS -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          Live Emergencies
+          <span class="alert-count" id="alertCount">0</span>
+        </div>
+        <div class="panel-body" id="alertList">
+          <div class="empty-state">
+            <div class="icon">📋</div>
+            <p>No active emergencies.<br>System is monitoring.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SCRIPTS ════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, addDoc, collection, onSnapshot, doc, updateDoc, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// ── REPLACE THESE WITH YOUR FIREBASE CONFIG ──
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+};
+// ─────────────────────────────────────────────
+
+// ── REPLACE WITH YOUR GEMINI API KEY ──
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY";
+// ──────────────────────────────────────
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+let isStaff    = false;
+let dataCache  = [];
+let selectedLang  = "en";
+let selectedFloor = "G";
+let baseFontSize  = 14;
+
+const LANG_NAMES = {
+  en: "English", hi: "Hindi", fr: "French",
+  ar: "Arabic",  zh: "Chinese", es: "Spanish"
+};
+
+const FLOOR_NAMES = {
+  G: "Ground Floor", 1:"Floor 1", 2:"Floor 2",
+  3:"Floor 3", 4:"Floor 4", 5:"Floor 5"
+};
+
+/* ════ UI HELPERS ════ */
+function showStatus(msg, type="info") {
+  const bar = document.getElementById("statusBar");
+  bar.innerHTML = msg;
+  bar.className = type;
+  if (type !== "info") setTimeout(() => { bar.className = ""; bar.innerHTML = ""; }, 4000);
+}
+
+window.selectLang = function(el) {
+  document.querySelectorAll(".lang-chip").forEach(c => c.classList.remove("selected"));
+  el.classList.add("selected");
+  selectedLang = el.dataset.lang;
+};
+
+window.selectFloor = function(el) {
+  document.querySelectorAll(".floor-btn").forEach(b => b.classList.remove("selected"));
+  el.classList.add("selected");
+  selectedFloor = el.dataset.floor;
+  document.getElementById("mapFloorLabel").textContent = FLOOR_NAMES[selectedFloor] || `Floor ${selectedFloor}`;
+  drawFloorMap();
+};
+
+window.toggleStaff = function() {
+  isStaff = !isStaff;
+  const pill = document.getElementById("modePill");
+  pill.textContent = isStaff ? "Staff Mode" : "Guest Mode";
+  pill.className = "mode-pill" + (isStaff ? " active" : "");
+  render();
+};
+
+window.increaseFontSize = function() {
+  baseFontSize = Math.min(baseFontSize + 2, 20);
+  document.body.style.fontSize = baseFontSize + "px";
+};
+window.decreaseFontSize = function() {
+  baseFontSize = Math.max(baseFontSize - 2, 12);
+  document.body.style.fontSize = baseFontSize + "px";
+};
+
+/* ════ FLOOR MAP CANVAS ════ */
+function drawFloorMap() {
+  const canvas = document.getElementById("floorCanvas");
+  const ctx    = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // background
+  ctx.fillStyle = "#f8f7f4";
+  ctx.fillRect(0, 0, W, H);
+
+  // Rooms grid
+  const rooms = [
+    {x:20,y:20,w:80,h:60,label:"101"},
+    {x:110,y:20,w:80,h:60,label:"102"},
+    {x:200,y:20,w:80,h:60,label:"103"},
+    {x:290,y:20,w:45,h:60,label:"Lift"},
+    {x:20,y:120,w:80,h:60,label:"102A"},
+    {x:110,y:120,w:80,h:60,label:"Restaurant"},
+    {x:200,y:120,w:80,h:60,label:"Lobby"},
+    {x:290,y:120,w:45,h:60,label:"Exit"},
+  ];
+
+  rooms.forEach(r => {
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#ddd8d0";
+    ctx.lineWidth = 1;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+    ctx.fillStyle = "#6b6860";
+    ctx.font = "10px IBM Plex Mono, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(r.label, r.x + r.w/2, r.y + r.h/2 + 4);
+  });
+
+  // Exit markers
+  ctx.fillStyle = "#27ae60";
+  ctx.beginPath();
+  ctx.arc(312, 150, 6, 0, Math.PI*2);
+  ctx.fill();
+
+  // Plot active alerts on this floor
+  const floorAlerts = dataCache.filter(d =>
+    d.floor === selectedFloor && d.status !== "resolved"
+  );
+  floorAlerts.forEach(d => {
+    const color = d.type==="Fire" ? "#e74c3c" : d.type==="Medical" ? "#1a6fb0" : "#b58a00";
+    const px = d.mapX || 150, py = d.mapY || 100;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, 8, 0, Math.PI*2);
+    ctx.fill();
+
+    // pulse ring
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+}
+
+drawFloorMap();
+setInterval(drawFloorMap, 2000); // re-draw every 2s for pulse effect
+
+/* ════ GEMINI API ════ */
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }]
+    })
+  });
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+async function getGeminiActionPlan(type, floor, location) {
+  const prompt = `You are a hotel emergency coordinator. An emergency has been reported.
+
+Emergency type: ${type}
+Floor: ${floor}
+Location: ${location}
+
+Give exactly 4 numbered steps for hotel staff to take RIGHT NOW. Be very specific to a hotel environment. Keep each step under 12 words. Plain text only, no markdown, no asterisks. Output format:
+1. Step one
+2. Step two
+3. Step three
+4. Step four`;
+
+  return callGemini(prompt);
+}
+
+async function translateMessage(text, targetLang) {
+  if (!text || targetLang === "en") return null;
+  const prompt = `Translate this emergency message to English. Return only the English translation, nothing else: "${text}"`;
+  return callGemini(prompt);
+}
+
+async function getGuestInstructions(type, guestLang) {
+  if (guestLang === "en") return null;
+  const langName = LANG_NAMES[guestLang] || guestLang;
+  const prompt = `You are a hotel safety system. An emergency type "${type}" has been reported.
+Write 3 short safety instructions for the hotel guest in ${langName}. 
+Keep each instruction under 10 words. Plain text, numbered list. No English translation.`;
+  return callGemini(prompt);
+}
+
+/* ════ HANDLE EMERGENCY ════ */
+window.handleEmergency = async function(type) {
+  const location = document.getElementById("location").value.trim();
+  const priority = document.getElementById("priority").value;
+  const message  = document.getElementById("message").value.trim();
+  const floor    = selectedFloor;
+  const lang     = selectedLang;
+
+  if (!location) {
+    showStatus("⚠️ Please enter your room or area.", "error");
+    return;
+  }
+
+  const duplicate = dataCache.find(d =>
+    d.type === type && d.floor === floor && d.location === location && d.status !== "resolved"
+  );
+  if (duplicate) {
+    showStatus("Already reported from this location. Tap Confirm on the alert.", "error");
+    return;
+  }
+
+  showStatus(`<span class="spinner"></span> Sending alert & generating protocol…`, "info");
+
+  // Random map position within canvas bounds
+  const mapX = Math.floor(Math.random() * 280) + 30;
+  const mapY = Math.floor(Math.random() * 140) + 30;
+
+  // Save to Firebase immediately
+  const docRef = await addDoc(collection(db, "emergencies"), {
+    type, location, floor, priority, message, lang,
+    status: "ongoing", reports: 1,
+    time: new Date().toISOString(),
+    mapX, mapY,
+    actionPlan: null,
+    translatedMessage: null,
+    guestInstructions: null,
+  });
+
+  // AI calls in parallel
+  try {
+    const [actionPlanRaw, translatedMsg, guestInstr] = await Promise.all([
+      getGeminiActionPlan(type, floor, location),
+      translateMessage(message, lang),
+      getGuestInstructions(type, lang),
+    ]);
+
+    // Parse steps from Gemini response
+    const steps = actionPlanRaw
+      .split("\n")
+      .filter(l => /^\d\./.test(l.trim()))
+      .map(l => l.replace(/^\d\.\s*/, "").trim())
+      .slice(0, 4);
+
+    // Update Firestore doc with AI data
+    await updateDoc(doc(db, "emergencies", docRef.id), {
+      actionPlan: steps,
+      translatedMessage: translatedMsg || null,
+      guestInstructions: guestInstr || null,
+    });
+
+    // Show in form panel
+    showAiPanel(steps, translatedMsg, guestInstr, lang);
+    showStatus("✓ Alert sent. Protocol generated by Gemini.", "success");
+
+  } catch(e) {
+    showStatus("✓ Alert sent. AI protocol unavailable right now.", "success");
+    console.error("Gemini error:", e);
+  }
+
+  document.getElementById("message").value = "";
+};
+
+function showAiPanel(steps, translatedMsg, guestInstr, lang) {
+  const panel = document.getElementById("aiPanel");
+  const stepsEl = document.getElementById("aiSteps");
+  const transEl = document.getElementById("aiTranslation");
+
+  stepsEl.innerHTML = steps.length
+    ? steps.map((s, i) => `<li><span class="step-num">0${i+1}</span>${s}</li>`).join("")
+    : "<li>Protocol not available</li>";
+
+  let transHtml = "";
+  if (translatedMsg) {
+    transHtml += `<div class="ai-translation">
+      <div class="trans-label">Guest message (translated)</div>
+      ${translatedMsg}
+    </div>`;
+  }
+  if (guestInstr) {
+    transHtml += `<div class="ai-translation" style="margin-top:6px">
+      <div class="trans-label">Guest instructions (${LANG_NAMES[lang] || lang})</div>
+      ${guestInstr}
+    </div>`;
+  }
+  transEl.innerHTML = transHtml;
+  panel.classList.add("visible");
+}
+
+/* ════ TIME HELPER ════ */
+function getTimeAgo(time) {
+  const diff = (Date.now() - new Date(time)) / 1000;
+  if (diff < 60)   return "just now";
+  if (diff < 3600) return Math.floor(diff/60) + " min ago";
+  return Math.floor(diff/3600) + " hr ago";
+}
+
+/* ════ ACCESSIBILITY — SPEAK ALERT ════ */
+window.speakLatestAlert = function() {
+  if (!dataCache.length) { speechSynthesis.speak(new SpeechSynthesisUtterance("No active emergencies.")); return; }
+  const d = dataCache[0];
+  const msg = `Emergency alert. ${d.type} emergency. Floor ${d.floor}. Location: ${d.location}. Priority: ${d.priority}. Status: ${d.status}.`;
+  const utt = new SpeechSynthesisUtterance(msg);
+  utt.rate = 0.9;
+  speechSynthesis.speak(utt);
+};
+
+window.speakAlert = function(id) {
+  const d = dataCache.find(x => x.id === id);
+  if (!d) return;
+  const msg = `${d.type} emergency on floor ${d.floor} at ${d.location}. Priority ${d.priority}. Current status: ${d.status}.`;
+  const utt = new SpeechSynthesisUtterance(msg);
+  utt.rate = 0.9;
+  speechSynthesis.speak(utt);
+};
+
+/* ════ FIREBASE LISTENER ════ */
+const q = query(collection(db, "emergencies"), orderBy("time", "desc"));
+
+onSnapshot(q, snap => {
+  dataCache = [];
+  snap.forEach(d => dataCache.push({ id: d.id, ...d.data() }));
+  render();
+  drawFloorMap();
+  document.getElementById("alertCount").textContent =
+    dataCache.filter(d => d.status !== "resolved").length;
+});
+
+/* ════ RENDER ALERTS ════ */
+function render() {
+  const list = document.getElementById("alertList");
+
+  if (!dataCache.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>No active emergencies.<br>System is monitoring.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = dataCache.map(d => {
+    const typeClass = d.type.toLowerCase();
+    const typeIcon  = d.type==="Fire" ? "🔥" : d.type==="Medical" ? "🚑" : "🛡️";
+    const statusClass = d.status==="ongoing" ? "status-ongoing"
+                      : d.status==="under control" ? "status-controlled"
+                      : "status-resolved";
+
+    const stepsHtml = d.actionPlan?.length
+      ? `<div class="alert-steps">
+          <div class="alert-steps-title">Gemini Protocol</div>
+          <ol>${d.actionPlan.map(s => `<li>${s}</li>`).join("")}</ol>
+        </div>`
+      : `<div class="alert-steps">
+          <div class="alert-steps-title">Protocol</div>
+          <ol>${defaultSteps(d.type).map(s=>`<li>${s}</li>`).join("")}</ol>
+        </div>`;
+
+    const msgHtml = d.message
+      ? `<div class="alert-msg">💬 ${d.message}</div>`
+      : "";
+
+    const transHtml = d.translatedMessage
+      ? `<div class="alert-translation">🌐 Translation: ${d.translatedMessage}</div>`
+      : "";
+
+    const guestHtml = d.guestInstructions && isStaff
+      ? `<div class="alert-translation">📢 Guest instructions (${LANG_NAMES[d.lang]||d.lang}): ${d.guestInstructions}</div>`
+      : "";
+
+    const staffActions = isStaff ? `
+      <button class="action-btn ongoing"    onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
+      <button class="action-btn controlled" onclick="updateStatus('${d.id}','under control')">Under Control</button>
+      <button class="action-btn resolved"   onclick="updateStatus('${d.id}','resolved')">Resolved</button>
+    ` : `<button class="action-btn confirm" onclick="confirmAlert('${d.id}',${d.reports||1})">👍 Confirm (${d.reports||1})</button>`;
+
+    return `<div class="alert-card">
+      <div class="alert-card-header ${typeClass}">
+        <div class="alert-type">${typeIcon} ${d.type} — Floor ${d.floor||"?"}</div>
+        <div class="alert-meta">${getTimeAgo(d.time)}</div>
+      </div>
+      <div class="alert-card-body">
+        <div class="alert-row">
+          <div class="alert-kv"><span class="k">Location</span><span class="v">${d.location}</span></div>
+          <div class="alert-kv"><span class="k">Priority</span><span class="v">${d.priority}</span></div>
+          <div class="alert-kv"><span class="k">Reports</span><span class="v">${d.reports||1}</span></div>
+          <div class="alert-kv"><span class="k">Status</span><span class="v"><span class="status-badge ${statusClass}">${d.status}</span></span></div>
+        </div>
+        ${msgHtml}${transHtml}${guestHtml}
+        ${stepsHtml}
+        <div class="action-row">
+          ${staffActions}
+          <button class="speak-btn" onclick="speakAlert('${d.id}')">🔊 Read</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function defaultSteps(type) {
+  if (type==="Fire")     return ["Evacuate guests via nearest exit","Activate fire alarm system","Call fire department (101)","Do not use elevators"];
+  if (type==="Medical")  return ["Call ambulance immediately (108)","Provide first aid if trained","Clear area around patient","Meet emergency services at entrance"];
+  return ["Secure the affected area","Alert security team immediately","Do not confront suspects","Document incident details"];
+}
+
+window.confirmAlert = async function(id, count) {
+  await updateDoc(doc(db,"emergencies",id), { reports: count+1 });
+};
+
+window.updateStatus = async function(id, status) {
+  await updateDoc(doc(db,"emergencies",id), { status });
+};
 
 </script>
 </body>
-</html>
+</html>  
+
+
+
+
+
 
 
 
