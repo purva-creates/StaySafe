@@ -607,6 +607,12 @@
             <textarea class="form-textarea" id="message" placeholder="Describe the situation..."></textarea>
           </div>
 
+          <!-- Photo Upload -->
+	   <div class="form-field">
+             <label class="form-label">Upload Photo (Optional)</label>
+             <input type="file" id="photoInput" accept="image/*" class="form-input">
+             </div>
+
           <!-- Status Bar -->
           <div id="statusBar"></div>
 
@@ -724,6 +730,42 @@ function showStatus(msg, type="info") {
   if (type !== "info") setTimeout(() => { bar.className = ""; bar.innerHTML = ""; }, 4000);
 }
 
+function resetForm() {
+  document.getElementById("location").value = "";
+  document.getElementById("message").value = "";
+  document.getElementById("priority").value = "HIGH";
+  document.getElementById("photoInput").value = "";
+
+  // reset floor to default (G)
+  selectedFloor = "G";
+  document.querySelectorAll(".floor-btn").forEach(btn => {
+    btn.classList.remove("selected");
+    if (btn.dataset.floor === "G") {
+      btn.classList.add("selected");
+    }
+  });
+
+  // reset language to English
+  selectedLang = "en";
+  document.querySelectorAll(".lang-chip").forEach(chip => {
+    chip.classList.remove("selected");
+    if (chip.dataset.lang === "en") {
+      chip.classList.add("selected");
+    }
+  });
+
+  // hide AI panel
+  document.getElementById("aiPanel").classList.remove("visible");
+
+  // clear status
+  document.getElementById("statusBar").className = "";
+  document.getElementById("statusBar").innerHTML = "";
+
+  // reset floor label + map
+  document.getElementById("mapFloorLabel").textContent = "Ground Floor";
+  drawFloorMap();
+}
+
 window.selectLang = function(el) {
   document.querySelectorAll(".lang-chip").forEach(c => c.classList.remove("selected"));
   el.classList.add("selected");
@@ -743,6 +785,7 @@ window.toggleStaff = function() {
   const pill = document.getElementById("modePill");
   pill.textContent = isStaff ? "Staff Mode" : "Guest Mode";
   pill.className = "mode-pill" + (isStaff ? " active" : "");
+  resetForm();
   render();
 };
 
@@ -875,6 +918,7 @@ window.handleEmergency = async function(type) {
   const location = document.getElementById("location").value.trim();
   const priority = document.getElementById("priority").value;
   const message  = document.getElementById("message").value.trim();
+ 
   const floor    = selectedFloor;
   const lang     = selectedLang;
 
@@ -897,16 +941,35 @@ window.handleEmergency = async function(type) {
   const mapX = Math.floor(Math.random() * 280) + 30;
   const mapY = Math.floor(Math.random() * 140) + 30;
 
-  // Save to Firebase immediately
-  const docRef = await addDoc(collection(db, "emergencies"), {
-    type, location, floor, priority, message, lang,
-    status: "ongoing", reports: 1,
-    time: new Date().toISOString(),
-    mapX, mapY,
-    actionPlan: null,
-    translatedMessage: null,
-    guestInstructions: null,
+const photoFile = document.getElementById("photoInput").files[0];
+let photoURL = null;
+
+ if (photoFile) {
+  photoURL = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(photoFile);
   });
+}
+
+  // Save to Firebase immediately
+ const docRef = await addDoc(collection(db, "emergencies"), {
+  type,
+  location,
+  floor,
+  priority,
+  message,
+  lang,
+  photoURL,
+  status: "ongoing",
+  reports: 1,
+  time: new Date().toISOString(),
+  mapX,
+  mapY,
+  actionPlan: null,
+  translatedMessage: null,
+  guestInstructions: null
+});
 
   // AI calls in parallel
   try {
@@ -940,7 +1003,9 @@ window.handleEmergency = async function(type) {
   }
 
   document.getElementById("message").value = "";
+  document.getElementById("photoInput").value = "";
 };
+
 
 function showAiPanel(steps, translatedMsg, guestInstr, lang) {
   const panel = document.getElementById("aiPanel");
@@ -1036,6 +1101,11 @@ function render() {
     const msgHtml = d.message
       ? `<div class="alert-msg">💬 ${d.message}</div>`
       : "";
+     const photoHtml = d.photoURL
+  ? `<div style="margin:8px 0;">
+       <img src="${d.photoURL}" style="width:100%;border-radius:6px;border:1px solid #ddd;">
+     </div>`
+  : "";
 
     const transHtml = d.translatedMessage
       ? `<div class="alert-translation">🌐 Translation: ${d.translatedMessage}</div>`
@@ -1044,6 +1114,12 @@ function render() {
     const guestHtml = d.guestInstructions && isStaff
       ? `<div class="alert-translation">📢 Guest instructions (${LANG_NAMES[d.lang]||d.lang}): ${d.guestInstructions}</div>`
       : "";
+
+const commandHtml = d.command
+  ? `<div style="background:#fff3cd;border:1px solid #ffeeba;padding:8px;border-radius:4px;margin:8px 0;">
+       📢 <strong>Staff Instruction:</strong> ${d.command}
+     </div>`
+  : "";
 
     const staffActions = isStaff ? `
       <button class="action-btn ongoing"    onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
@@ -1063,8 +1139,22 @@ function render() {
           <div class="alert-kv"><span class="k">Reports</span><span class="v">${d.reports||1}</span></div>
           <div class="alert-kv"><span class="k">Status</span><span class="v"><span class="status-badge ${statusClass}">${d.status}</span></span></div>
         </div>
-        ${msgHtml}${transHtml}${guestHtml}
+      ${msgHtml}${photoHtml}${transHtml}${guestHtml}${commandHtml}
         ${stepsHtml}
+
+    ${isStaff ? `
+     <div style="margin-top:10px;">
+     <input 
+      type="text" 
+      placeholder="Type instruction for guests..." 
+      id="cmd-${d.id}" 
+      style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-bottom:6px;"
+    />
+    <button class="action-btn" onclick="sendCommand('${d.id}')">
+      Send Instruction
+    </button>
+  </div>
+` : ""}
         <div class="action-row">
           ${staffActions}
           <button class="speak-btn" onclick="speakAlert('${d.id}')">🔊 Read</button>
@@ -1088,9 +1178,22 @@ window.updateStatus = async function(id, status) {
   await updateDoc(doc(db,"emergencies",id), { status });
 };
 
+window.sendCommand = async function(id) {
+  const input = document.getElementById(`cmd-${id}`);
+  const text = input.value.trim();
+
+  if (!text) return;
+
+  await updateDoc(doc(db, "emergencies", id), {
+    command: text
+  });
+
+  input.value = "";
+};
+
 </script>
 </body>
-</html>  
+</html>   
 
 
 
