@@ -966,6 +966,12 @@ let photoURL = null;
   time: new Date().toISOString(),
   mapX,
   mapY,
+
+  // NEW FIELDS
+  emergencySent: false,
+  dispatchStatus: "Not Sent",
+  caseId: null,
+
   actionPlan: null,
   translatedMessage: null,
   guestInstructions: null
@@ -1101,6 +1107,10 @@ function render() {
     const msgHtml = d.message
       ? `<div class="alert-msg">💬 ${d.message}</div>`
       : "";
+
+    const emergencyHtml = d.emergencyNotified
+     ? `<div class="alert-translation">🚑 Emergency Services Notified</div>`
+     : "";
      const photoHtml = d.photoURL
   ? `<div style="margin:8px 0;">
        <img src="${d.photoURL}" style="width:100%;border-radius:6px;border:1px solid #ddd;">
@@ -1120,12 +1130,23 @@ const commandHtml = d.command
        📢 <strong>Staff Instruction:</strong> ${d.command}
      </div>`
   : "";
+const staffActions = isStaff ? `
+  <button class="action-btn" onclick="sendToEmergency('${d.id}')">
+    🚨 Send to Emergency
+  </button>
 
-    const staffActions = isStaff ? `
-      <button class="action-btn ongoing"    onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
-      <button class="action-btn controlled" onclick="updateStatus('${d.id}','under control')">Under Control</button>
-      <button class="action-btn resolved"   onclick="updateStatus('${d.id}','resolved')">Resolved</button>
-    ` : `<button class="action-btn confirm" onclick="confirmAlert('${d.id}',${d.reports||1})">👍 Confirm (${d.reports||1})</button>`;
+  <button class="action-btn ongoing" onclick="updateStatus('${d.id}','ongoing')">Ongoing</button>
+  <button class="action-btn controlled" onclick="updateStatus('${d.id}','under control')">Under Control</button>
+  <button class="action-btn resolved" onclick="updateStatus('${d.id}','resolved')">Resolved</button>
+
+  <button class="action-btn" onclick="updateDispatch('${d.id}','On the way')">🚑 On the way</button>
+  <button class="action-btn" onclick="updateDispatch('${d.id}','Arrived')">📍 Arrived</button>
+  <button class="action-btn" onclick="updateDispatch('${d.id}','Completed')">✅ Completed</button>
+` : `
+  <button class="action-btn confirm" onclick="confirmAlert('${d.id}',${d.reports||1})">
+    👍 Confirm (${d.reports||1})
+  </button>
+`;
 
     return `<div class="alert-card">
       <div class="alert-card-header ${typeClass}">
@@ -1139,7 +1160,22 @@ const commandHtml = d.command
           <div class="alert-kv"><span class="k">Reports</span><span class="v">${d.reports||1}</span></div>
           <div class="alert-kv"><span class="k">Status</span><span class="v"><span class="status-badge ${statusClass}">${d.status}</span></span></div>
         </div>
-      ${msgHtml}${photoHtml}${transHtml}${guestHtml}${commandHtml}
+     ${msgHtml}${photoHtml}${transHtml}${guestHtml}${commandHtml}
+
+${d.emergencySent ? `
+  <div style="background:#eef4fb;border:1px solid #c8dff5;padding:8px;border-radius:4px;margin:8px 0;">
+   🚨 <strong>Case ID:</strong> 
+<span style="color:#1a6fb0;cursor:pointer;text-decoration:underline;"
+  onclick="openCase('${d.id}')">
+  ${d.caseId}
+</span>
+
+    📡 Emergency Services Notified<br>
+    🚑 <strong>Dispatch Status:</strong> ${d.dispatchStatus}
+  </div>
+` : ""}
+
+
         ${stepsHtml}
 
     ${isStaff ? `
@@ -1178,6 +1214,12 @@ window.updateStatus = async function(id, status) {
   await updateDoc(doc(db,"emergencies",id), { status });
 };
 
+window.notifyEmergency = async function(id) {
+  await updateDoc(doc(db, "emergencies", id), {
+    emergencyNotified: true
+  });
+};
+
 window.sendCommand = async function(id) {
   const input = document.getElementById(`cmd-${id}`);
   const text = input.value.trim();
@@ -1191,9 +1233,72 @@ window.sendCommand = async function(id) {
   input.value = "";
 };
 
+window.sendToEmergency = async function(id) {
+  const caseId = "ES-" + Math.floor(Math.random() * 9000 + 1000);
+
+  await updateDoc(doc(db, "emergencies", id), {
+    emergencySent: true,
+    dispatchStatus: "On the way",
+    caseId: caseId
+  });
+};
+
+window.updateDispatch = async function(id, status) {
+  await updateDoc(doc(db, "emergencies", id), {
+    dispatchStatus: status
+  });
+};
+
+window.openCase = function(id) {
+  const d = dataCache.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById("caseDetails").innerHTML = `
+    <p><strong>Case ID:</strong> ${d.caseId}</p>
+    <p><strong>Type:</strong> ${d.type}</p>
+    <p><strong>Location:</strong> ${d.location}</p>
+    <p><strong>Floor:</strong> ${d.floor}</p>
+    <p><strong>Status:</strong> ${d.status}</p>
+    <p><strong>Dispatch:</strong> ${d.dispatchStatus}</p>
+    ${d.photoURL ? `<img src="${d.photoURL}" style="width:100%;margin-top:10px;border-radius:6px;">` : ""}
+  `;
+
+  document.getElementById("casePopup").style.display = "block";
+};
+window.onclick = function(e) {
+  const popup = document.getElementById("casePopup");
+  if (e.target === popup) {
+    popup.style.display = "none";
+  }
+};
+
+window.closeCase = function() {
+  document.getElementById("casePopup").style.display = "none";
+}; 
+
 </script>
+<div id="casePopup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+background:rgba(0,0,0,0.5);z-index:999;">
+  
+  <div style="background:white;width:90%;max-width:500px;margin:60px auto;padding:20px;border-radius:8px;position:relative;">
+    
+    <h3 style="margin-bottom:10px;">🚨 Emergency Case Details</h3>
+    
+    <div id="caseDetails"></div>
+
+    <button onclick="closeCase()" 
+      style="margin-top:15px;padding:6px 12px;border:none;background:#e74c3c;color:white;border-radius:4px;cursor:pointer;">
+      Close
+    </button>
+
+  </div>
+</div>
 </body>
-</html>   
+</html>  
+
+
+
+
 
 
 
