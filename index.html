@@ -602,10 +602,19 @@
           </div>
 
           <!-- Message -->
-          <div class="form-field">
-            <label class="form-label">Message (Optional — any language)</label>
-            <textarea class="form-textarea" id="message" placeholder="Describe the situation..."></textarea>
-          </div>
+         
+
+<div class="form-field">
+  <label class="form-label">Message (Optional — any language)</label>
+  
+  <textarea class="form-textarea" id="message" placeholder="Describe the situation..."></textarea>
+
+  <!-- 🎤 ADD THIS HERE -->
+  <button onclick="startVoiceInput()" style="margin-top:6px;padding:6px 10px;">
+    🎤 Speak
+  </button>
+
+</div>
 
           <!-- Photo Upload -->
 	   <div class="form-field">
@@ -734,6 +743,63 @@ const FLOOR_NAMES = {
   3:"Floor 3", 4:"Floor 4", 5:"Floor 5"
 };
 
+function analyzeEmergency(message) {
+  const text = message.toLowerCase();
+
+  let detectedType = "General";
+  let severity = "LOW";
+  let keywords = [];
+
+  // FIRE
+  if (
+    text.includes("fire") || 
+    text.includes("smoke") || 
+    text.includes("burn") ||
+    text.includes("flames")
+  ) {
+    detectedType = "Fire";
+    severity = "HIGH";
+    keywords.push("fire");
+  }
+
+  // MEDICAL
+  else if (
+    text.includes("injury") || 
+    text.includes("blood") || 
+    text.includes("unconscious") ||
+    text.includes("faint") ||
+    text.includes("heart")
+  ) {
+    detectedType = "Medical";
+    severity = "HIGH";
+    keywords.push("medical");
+  }
+
+  // SECURITY
+  else if (
+    text.includes("theft") || 
+    text.includes("fight") || 
+    text.includes("suspicious") ||
+    text.includes("gun") ||
+    text.includes("attack")
+  ) {
+    detectedType = "Security";
+    severity = "MEDIUM";
+    keywords.push("security");
+  }
+
+  // FALLBACK (IMPORTANT)
+  else if (text.length > 5) {
+    severity = "MEDIUM";
+    keywords.push("unknown emergency");
+  }
+
+  return {
+    detectedType,
+    severity,
+    keywords
+  };
+}
 /* ════ UI HELPERS ════ */
 function showStatus(msg, type="info") {
   const bar = document.getElementById("statusBar");
@@ -918,18 +984,35 @@ Give exactly 4 numbered steps for hotel staff to take RIGHT NOW. Be very specifi
   return callGemini(prompt);
 }
 
-async function translateMessage(text, targetLang) {
-  if (!text || targetLang === "en") return null;
-  const prompt = `Translate this emergency message to English. Return only the English translation, nothing else: "${text}"`;
+async function translateMessage(text, sourceLang) {
+  if (!text) return null;
+
+  const prompt = `
+  Detect the language and translate this message to English:
+  "${text}"
+  Return ONLY translated English text.
+  `;
+
   return callGemini(prompt);
 }
 
 async function getGuestInstructions(type, guestLang) {
   if (guestLang === "en") return null;
+
   const langName = LANG_NAMES[guestLang] || guestLang;
-  const prompt = `You are a hotel safety system. An emergency type "${type}" has been reported.
-Write 3 short safety instructions for the hotel guest in ${langName}. 
-Keep each instruction under 10 words. Plain text, numbered list. No English translation.`;
+
+  const prompt = `
+You are a hotel safety system.
+
+Emergency type: ${type}
+
+Give 3 short safety instructions in ${langName}.
+Use ONLY ${langName} language.
+Do NOT use English.
+Keep each instruction under 10 words.
+Numbered list only.
+`;
+
   return callGemini(prompt);
 }
 
@@ -938,6 +1021,11 @@ window.handleEmergency = async function(type) {
   const location = document.getElementById("location").value.trim();
   const priority = document.getElementById("priority").value;
   const message  = document.getElementById("message").value.trim();
+
+// 🧠 AI ANALYSIS
+const aiResult = analyzeEmergency(message);
+
+console.log("AI Result:", aiResult);
  
   const floor    = selectedFloor;
   const lang     = selectedLang;
@@ -981,13 +1069,18 @@ let photoURL = null;
   message,
   lang,
   photoURL,
+
+  // 🧠 AI DATA
+  aiDetectedType: aiResult.detectedType,
+  aiSeverity: aiResult.severity,
+  aiKeywords: aiResult.keywords,
+
   status: "ongoing",
   reports: 1,
   time: new Date().toISOString(),
   mapX,
   mapY,
 
-  // NEW FIELDS
   emergencySent: false,
   dispatchStatus: "Not Sent",
   caseId: null,
@@ -1184,7 +1277,16 @@ const staffActions = isStaffMode() ? `
           <div class="alert-kv"><span class="k">Reports</span><span class="v">${d.reports||1}</span></div>
           <div class="alert-kv"><span class="k">Status</span><span class="v"><span class="status-badge ${statusClass}">${d.status}</span></span></div>
         </div>
-     ${msgHtml}${photoHtml}${transHtml}${guestHtml}${commandHtml}
+   ${msgHtml}
+
+<div style="background:#eef4fb;border:1px solid #c8dff5;padding:8px;border-radius:4px;margin:8px 0;">
+  🤖 <strong>AI Analysis:</strong><br>
+  Type: ${d.aiDetectedType || "N/A"}<br>
+  Severity: ${d.aiSeverity || "N/A"}<br>
+  Keywords: ${(d.aiKeywords || []).join(", ")}
+</div>
+
+${photoHtml}${transHtml}${guestHtml}${commandHtml}
 
 ${d.emergencySent ? `
   <div style="background:#eef4fb;border:1px solid #c8dff5;padding:8px;border-radius:4px;margin:8px 0;">
@@ -1323,6 +1425,28 @@ window.searchCase = function() {
   } else {
     alert("Case not found");
   }
+};
+
+window.startVoiceInput = function() {
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+const langMap = {
+  en: "en-US",
+  hi: "hi-IN",
+  fr: "fr-FR",
+  ar: "ar-SA",
+  zh: "zh-CN",
+  es: "es-ES"
+};
+
+recognition.lang = langMap[selectedLang] || "en-US";
+ 
+
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    document.getElementById("message").value = transcript;
+  };
+
+  recognition.start();
 };
 
 </script>
